@@ -1,0 +1,13 @@
+[Unit]
+Description=DGX Spark load-anticipating fan control
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/spark-fan/spark_fan.py
+Restart=always
+RestartSec=2
+DynamicUser=yes
+SupplementaryGroups=dialout
+
+[Install]
+WantedBy=multi-user.target
