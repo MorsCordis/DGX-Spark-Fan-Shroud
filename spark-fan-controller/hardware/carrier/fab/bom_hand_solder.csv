@@ -1,0 +1,4 @@
+Designator,Part,Note
+"J1,J2","1x9 female header, 2.54 mm, ~8.5 mm tall",RP2040-Zero plugs in here
+J3,4-pin PWM fan header (Molex 47053-1000 style),pin 1 = GND (square pad)
+"H1,H2",M2.5 screws/standoffs,enclosure mounting

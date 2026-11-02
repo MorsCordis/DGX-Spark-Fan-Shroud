@@ -1,0 +1,8 @@
+Manufacturer Part Number,Manufacturer,DigiKey Part Number,Quantity,Description
+PPTC091LFBN-RC,Sullins Connector Solutions,S7007-ND,2,1x9 female header 2.54 mm 8.5 mm tall (RP2040-Zero sockets J1/J2)
+0470531000,Molex,WM4330-ND,1,4-pin keyed PWM fan header KK254 (J3)
+PLPC2-3MM,Bivar,492-1994-ND,1,Light pipe 2 mm press-fit 3 mm body (over RP2040-Zero RGB LED)
+PLPC2-500,Bivar,492-1993-ND,1,Light pipe 2 mm press-fit 0.500 in body (over 12 V LED D2)
+8193,Radial Magnets,469-1004-ND,4,NdFeB disc magnet 1/4 x 1/8 in N35 (fan guard)
+09450-M/45,Qualtek,CR219-ND,1,120 mm foam filter element 45 PPI (cut with filter_template.svg)
+CBL-UC-UC-05BP,Same Sky,2223-CBL-UC-UC-05BP-ND,1,USB-C to USB-C cable USB 2.0 3 A 0.5 m (19.7 in) black (matches the fan lead)

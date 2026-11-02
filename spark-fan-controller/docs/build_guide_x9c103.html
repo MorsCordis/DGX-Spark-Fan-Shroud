@@ -1,0 +1,631 @@
+<title>Spark Fan Controller</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single drafting-sheet column; schematic first, then the build steps. */
+:root {
+  --bg: #eef1ee;
+  --sheet: #f8faf8;
+  --ink: #1b2420;
+  --muted: #59655f;
+  --rule: #c7d0ca;
+  --accent: #0d6b66;
+  --warn-bg: #fbeee9;
+  --warn-ink: #8a2c1a;
+  --n5v: #c2412d;
+  --ngnd: #1b2420;
+  --nctl: #2a5db0;
+  --npot: #a86f0c;
+  --nfan: #6a4bb0;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111614; --sheet: #171d1a; --ink: #dce4df; --muted: #8f9b95; --rule: #2d3832;
+    --accent: #52b8b0; --warn-bg: #2c1913; --warn-ink: #ffb4a3;
+    --n5v: #ff7a62; --ngnd: #dce4df; --nctl: #7ea8ff; --npot: #e2ad45; --nfan: #b6a0ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111614; --sheet: #171d1a; --ink: #dce4df; --muted: #8f9b95; --rule: #2d3832;
+  --accent: #52b8b0; --warn-bg: #2c1913; --warn-ink: #ffb4a3;
+  --n5v: #ff7a62; --ngnd: #dce4df; --nctl: #7ea8ff; --npot: #e2ad45; --nfan: #b6a0ff;
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+  display: grid; gap: 40px;
+}
+header { display: grid; gap: 8px; }
+.kicker { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--f-display); font-weight: 500; font-size: 17px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--muted); font-size: 16px; }
+section { display: grid; gap: 16px; min-width: 0; }
+code, .mono { font-family: var(--f-mono); font-size: .92em; }
+
+.warns { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.warn { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; }
+.warn b { font-family: var(--f-display); font-weight: 700; }
+
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; }
+.sheet svg { display: block; min-width: 860px; width: 100%; height: auto; }
+.sheet.plan svg { min-width: 560px; }
+.titleblock { display: flex; flex-wrap: wrap; gap: 4px 24px; border-top: 1px solid var(--rule); padding: 8px 14px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+
+svg text { font-family: var(--f-mono); fill: var(--ink); }
+svg .box { fill: none; stroke: var(--ink); stroke-width: 1.6; }
+svg .ref { font-family: var(--f-display); font-weight: 700; font-size: 15px; }
+svg .pin { font-size: 12.5px; }
+svg .note { font-size: 12px; fill: var(--muted); }
+svg .w { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+svg .n5v { stroke: var(--n5v); } svg .t5v { fill: var(--n5v); }
+svg .ngnd { stroke: var(--ngnd); } svg .tgnd { fill: var(--ngnd); }
+svg .nctl { stroke: var(--nctl); } svg .tctl { fill: var(--nctl); }
+svg .npot { stroke: var(--npot); } svg .tpot { fill: var(--npot); }
+svg .nfan { stroke: var(--nfan); } svg .tfan { fill: var(--nfan); }
+svg .nusb { stroke: var(--accent); } svg .tusb { fill: var(--accent); }
+svg .dot { stroke: none; }
+svg .nc { stroke: var(--warn-ink); stroke-width: 2; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 11.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: none; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); color: var(--muted); }
+.chip { font-family: var(--f-mono); font-size: 12px; padding: 1px 7px; border-radius: 10px; border: 1.5px solid currentColor; white-space: nowrap; }
+.c5v { color: var(--n5v); } .cgnd { color: var(--ngnd); } .cctl { color: var(--nctl); } .cpot { color: var(--npot); } .cfan { color: var(--nfan); } .cusb { color: var(--accent); }
+
+ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 76ch; }
+ol.steps li::marker { font-family: var(--f-mono); color: var(--accent); }
+
+.two { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; }
+.two > * { min-width: 0; }
+
+details { border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+summary { cursor: pointer; padding: 10px 14px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+summary:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button { font: 500 13px var(--f-body); color: var(--sheet); background: var(--accent); border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+pre { margin: 0; padding: 14px; overflow-x: auto; border-top: 1px solid var(--rule); font-family: var(--f-mono); font-size: 12.5px; line-height: 1.5; max-height: 560px; }
+.muted { color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">DGX Spark fan shroud · controller build</div>
+    <h1>Spark Fan Controller</h1>
+    <p class="lede">Wiring and enclosure for the digital-pot design from <span class="mono">hyudryu/DGX-Spark-Fan-Shroud</span>: an RP2040-Zero steps an X9C103 that stands in for the Owltree's speed knob. One USB-C cable from the Spark powers all three boards and the fan.</p>
+  </header>
+
+  <div class="warns">
+    <div class="warn"><b>Leave the Owltree's own USB-C unplugged</b><span>Its VCC pad is wired to the RP2040's 5V. Plugging both cables in ties two USB supplies together.</span></div>
+    <div class="warn"><b>Measure before you solder</b><span>The Owltree VCC pad must read about 5 V, and no pot pad may exceed 5 V. Anything higher is outside the X9C103's rating.</span></div>
+  </div>
+
+  <section aria-labelledby="sch">
+    <h2 id="sch">Schematic</h2>
+    <div class="sheet">
+      <svg viewBox="0 0 1060 500" role="img" aria-label="Schematic: DGX Spark USB-C to RP2040-Zero; RP2040 5V and GND run separately to the X9C103 and the Owltree; GP27, GP28, GP29 to X9C103 CS, U/D, INC; X9C103 VH, VW, VL to Owltree pot pads; the old knob's switch pads are bridged; Owltree fan header to the Noctua fan.">
+        <!-- Spark -->
+        <rect class="box" x="20" y="190" width="100" height="70" rx="4"/>
+        <text class="ref" x="70" y="220" text-anchor="middle">DGX Spark</text>
+        <text class="pin" x="70" y="240" text-anchor="middle">USB-C port</text>
+        <path class="w nusb" d="M120 225 H170"/>
+        <text class="note" x="70" y="282" text-anchor="middle">data-capable</text>
+        <text class="note" x="70" y="298" text-anchor="middle">USB-C cable</text>
+
+        <!-- U1 RP2040-Zero -->
+        <text class="ref" x="212" y="110">U1 · RP2040-Zero</text>
+        <rect class="box" x="170" y="120" width="160" height="210" rx="3"/>
+        <text class="pin" x="200" y="138" text-anchor="middle">5V</text>
+        <text class="pin" x="200" y="322" text-anchor="middle">GND</text>
+        <text class="pin" x="178" y="229">USB-C</text>
+        <text class="pin" x="322" y="234" text-anchor="end">GP27</text>
+        <text class="pin" x="322" y="264" text-anchor="end">GP28</text>
+        <text class="pin" x="322" y="294" text-anchor="end">GP29</text>
+
+        <!-- +5V: separate runs from U1 to U2 and to U3 -->
+        <path class="w n5v" d="M200 120 V80 H790 V190"/>
+        <path class="w n5v" d="M200 120 V96 H545 V190"/>
+        <circle class="dot t5v" cx="200" cy="96" r="4"/>
+        <text class="pin t5v" x="380" y="70">+5V to Owltree (fan current, 22–24 AWG)</text>
+        <text class="pin t5v" x="380" y="110">+5V to X9C103</text>
+
+        <!-- GND: separate runs from U1 to U2 and to U3 -->
+        <path class="w ngnd" d="M200 330 V450 H770 V380"/>
+        <path class="w ngnd" d="M200 330 V420 H545 V330"/>
+        <circle class="dot tgnd" cx="200" cy="420" r="4"/>
+        <text class="pin tgnd" x="380" y="412">GND to X9C103</text>
+        <text class="pin tgnd" x="380" y="472">GND to Owltree (fan return, 22–24 AWG)</text>
+
+        <!-- Control lines -->
+        <path class="w nctl" d="M330 230 H470"/>
+        <path class="w nctl" d="M330 260 H470"/>
+        <path class="w nctl" d="M330 290 H470"/>
+        <text class="pin tctl" x="400" y="223" text-anchor="middle">CS</text>
+        <text class="pin tctl" x="400" y="253" text-anchor="middle">U/D</text>
+        <text class="pin tctl" x="400" y="283" text-anchor="middle">INC</text>
+
+        <!-- U2 X9C103 -->
+        <text class="ref" x="555" y="180">U2 · X9C103</text>
+        <rect class="box" x="470" y="190" width="150" height="140" rx="3"/>
+        <text class="pin" x="545" y="208" text-anchor="middle">VCC</text>
+        <text class="pin" x="545" y="322" text-anchor="middle">GND</text>
+        <text class="pin" x="478" y="234">CS</text>
+        <text class="pin" x="478" y="264">U/D</text>
+        <text class="pin" x="478" y="294">INC</text>
+        <text class="pin" x="612" y="234" text-anchor="end">VH</text>
+        <text class="pin" x="612" y="264" text-anchor="end">VW</text>
+        <text class="pin" x="612" y="294" text-anchor="end">VL</text>
+
+        <!-- Pot lines -->
+        <path class="w npot" d="M620 230 H740"/>
+        <path class="w npot" d="M620 260 H740"/>
+        <path class="w npot" d="M620 290 H740"/>
+        <text class="note" x="680" y="223" text-anchor="middle">outer pad</text>
+        <text class="note" x="680" y="253" text-anchor="middle">centre pad</text>
+        <text class="note" x="680" y="283" text-anchor="middle">outer pad</text>
+
+        <!-- U3 Owltree -->
+        <rect class="box" x="740" y="190" width="170" height="190" rx="3"/>
+        <text class="pin" x="790" y="208" text-anchor="middle">VCC pad</text>
+        <text class="pin" x="748" y="234">POT A</text>
+        <text class="pin" x="748" y="264">POT W</text>
+        <text class="pin" x="748" y="294">POT B</text>
+        <text class="pin" x="902" y="219" text-anchor="end">1 GND</text>
+        <text class="pin" x="902" y="244" text-anchor="end">2 +12V</text>
+        <text class="pin" x="902" y="269" text-anchor="end">3 TACH</text>
+        <text class="pin" x="902" y="294" text-anchor="end">4 PWM</text>
+        <text class="ref" x="825" y="326" text-anchor="middle">U3 · Owltree</text>
+        <text class="note" x="825" y="343" text-anchor="middle">PC039b, USB-C boost</text>
+        <text class="pin" x="770" y="372" text-anchor="middle">GND</text>
+        <text class="pin" x="830" y="372" text-anchor="middle">SW</text>
+        <text class="pin" x="862" y="372" text-anchor="middle">SW</text>
+
+        <!-- Knob switch pads: bridged -->
+        <path class="w nusb" d="M830 380 V398 H862 V380"/>
+        <text class="pin tusb" x="846" y="418" text-anchor="middle">jumper</text>
+        <text class="note" x="846" y="434" text-anchor="middle">old knob's switch,</text>
+        <text class="note" x="846" y="449" text-anchor="middle">in series with +12V</text>
+
+        <!-- Owltree USB-C: no connect -->
+        <path class="w nc" d="M880 190 V160"/>
+        <path class="nc" d="M872 152 L888 168 M888 152 L872 168"/>
+        <text class="note" x="894" y="164">own USB-C unused</text>
+
+        <!-- Fan -->
+        <path class="w nfan" d="M910 215 H950"/>
+        <path class="w nfan" d="M910 240 H950"/>
+        <path class="w nfan" d="M910 265 H950"/>
+        <path class="w nfan" d="M910 290 H950"/>
+        <rect class="box" x="950" y="203" width="14" height="99" rx="2"/>
+        <path class="w nfan" d="M964 252 H982"/>
+        <circle class="box" cx="1012" cy="252" r="30"/>
+        <text class="ref" x="1012" y="258" text-anchor="middle">M</text>
+        <text class="note" x="1012" y="302" text-anchor="middle">NF-F12</text>
+        <text class="note" x="1012" y="318" text-anchor="middle">iPPC-3000</text>
+        <text class="note" x="1012" y="334" text-anchor="middle">12 V PWM</text>
+      </svg>
+      <div class="titleblock">
+        <span>U3 knob (B10K) removed; X9C103 wired to its three pot pads</span>
+        <span>Knob's two switch pads bridged: the switch sits in series with +12V</span>
+        <span>Fan current on +5V ≈ 0.9 A at full speed</span>
+      </div>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><i style="background:var(--n5v)"></i>+5V</span>
+      <span><i style="background:var(--ngnd)"></i>GND</span>
+      <span><i style="background:var(--nctl)"></i>pot control (3.3 V logic)</span>
+      <span><i style="background:var(--npot)"></i>pot resistor terminals</span>
+      <span><i style="background:var(--nfan)"></i>stock fan plug</span>
+      <span><i style="background:var(--accent)"></i>USB cable, switch jumper</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="wires">
+    <h2 id="wires">Wire list</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>From</th><th>To</th><th>Net</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>Spark USB-C</td><td>U1 USB-C</td><td><span class="chip cusb">USB</span></td><td>Must carry data. Powers everything.</td></tr>
+          <tr><td class="num">2</td><td>U1 5V</td><td>U2 VCC</td><td><span class="chip c5v">+5V</span></td><td>Separate wire from the U3 run; both start at the U1 pin.</td></tr>
+          <tr><td class="num">3</td><td>U1 5V</td><td>U3 VCC pad</td><td><span class="chip c5v">+5V</span></td><td>Carries the fan's supply current. Use 22–24 AWG. The pad should beep to one end of the 6R8 inductor.</td></tr>
+          <tr><td class="num">4</td><td>U1 GND</td><td>U2 GND</td><td><span class="chip cgnd">GND</span></td><td>Separate wire from the U3 run.</td></tr>
+          <tr><td class="num">5</td><td>U1 GND</td><td>U3 GND pad</td><td><span class="chip cgnd">GND</span></td><td>Fan return current and the pot's reference. 22–24 AWG.</td></tr>
+          <tr><td class="num">6</td><td>U1 GP27</td><td>U2 CS</td><td><span class="chip cctl">CS</span></td><td>3.3 V drive is enough: X9C103 V<sub>IH</sub> is 2 V.</td></tr>
+          <tr><td class="num">7</td><td>U1 GP28</td><td>U2 U/D</td><td><span class="chip cctl">U/D</span></td><td></td></tr>
+          <tr><td class="num">8</td><td>U1 GP29</td><td>U2 INC</td><td><span class="chip cctl">INC</span></td><td></td></tr>
+          <tr><td class="num">9</td><td>U2 VH</td><td>U3 pot outer pad A</td><td><span class="chip cpot">VH</span></td><td>Swap 9 and 11 if speed runs backwards, or flip the firmware flag.</td></tr>
+          <tr><td class="num">10</td><td>U2 VW</td><td>U3 pot centre pad</td><td><span class="chip cpot">VW</span></td><td>Always the centre pad.</td></tr>
+          <tr><td class="num">11</td><td>U2 VL</td><td>U3 pot outer pad B</td><td><span class="chip cpot">VL</span></td><td></td></tr>
+          <tr><td class="num">12</td><td>Fan plug</td><td>U3 fan header</td><td><span class="chip cfan">FAN</span></td><td>Stock 4-pin plug, no changes.</td></tr>
+          <tr><td class="num">13</td><td>U3 knob switch pad</td><td>U3 knob switch pad</td><td><span class="chip cusb">JUMPER</span></td><td>The knob's click switch is in series with +12V. Without this jumper the fan header sits near 3 V and the fan never spins.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="bring">
+    <h2 id="bring">Bring-up</h2>
+    <ol class="steps">
+      <li><b>Test the Owltree stock.</b> Power it from its own USB-C with the fan attached and the knob still fitted. Confirm the knob changes the fan speed.</li>
+      <li><b>Measure while it runs.</b> VCC pad to GND pad should read about 5 V. On the knob, one outer pin reads near 0 V, the other at most 5 V, and the centre pin moves as you turn it. Stop if anything reads above 5 V.</li>
+      <li><b>Remove the knob.</b> Unplug, then remove the B10K pot. Its tabs and flush wiper pin make clean desoldering hard; prying it off works, then check that no pads lifted. It has five terminals: three for the pot and two for its click switch. <b>Bridge the two switch pads</b>, because that switch carries the fan's +12V.</li>
+      <li><b>Flash U1 alone.</b> Plug only the RP2040-Zero into the Spark. Check that its 5V pin reads about 5 V, install MicroPython, and copy the repo's <code>firmware/main.py</code> unchanged.</li>
+      <li><b>Wire it up</b> per the wire list. From now on the Owltree's own USB-C stays empty.</li>
+      <li><b>Power on.</b> The firmware homes the pot, then requests full speed, so the fan should spin up hard within a second.</li>
+      <li><b>Check direction.</b> Send <code>DUTY 0</code> over serial. On this build the stock setting was correct: <code>DUTY 255</code> is full speed and <code>DUTY 0</code> stops the fan. If yours speeds up instead, set <code>MAX_SPEED_AT_HIGH_TAP = True</code> in <code>main.py</code> rather than resoldering.</li>
+      <li><b>Start the host control</b>: either the repo's FanController, or <code>spark_fan.py</code> for load-anticipating control. Run only one, since they share the serial port. This firmware has no tach, so RPM always reads 0.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="box">
+    <h2 id="box">Enclosure</h2>
+    <p>A parametric OpenSCAD box holds the three boards in a row on corner brackets. The RP2040's USB-C sits flush with one end wall. The fan lead drops into a notch in the other end, and zip-tie ears on the long sides strap it to the shroud leg or base. Drawn below at the default sizes; measure your boards and edit the values at the top of the file.</p>
+    <div class="sheet plan">
+      <svg viewBox="-14 -20 168 96" role="img" aria-label="Top view of the enclosure: RP2040-Zero at the left end against the USB-C opening, X9C103 in the middle, Owltree at the right end near the fan lead notch, zip-tie ears centred on both long sides.">
+        <rect x="61" y="-10" width="16" height="10.5" fill="none" stroke="var(--muted)" stroke-width=".4"/>
+        <rect x="65" y="-6.75" width="8" height="3.5" fill="none" stroke="var(--muted)" stroke-width=".3"/>
+        <rect x="61" y="49.5" width="16" height="10.5" fill="none" stroke="var(--muted)" stroke-width=".4"/>
+        <rect x="65" y="53.25" width="8" height="3.5" fill="none" stroke="var(--muted)" stroke-width=".3"/>
+        <rect x="0" y="0" width="138" height="50" rx="3" fill="var(--sheet)" stroke="var(--ink)" stroke-width=".6"/>
+        <rect x="2" y="2" width="134" height="46" rx="1" fill="none" stroke="var(--rule)" stroke-width=".4" stroke-dasharray="1.5 1"/>
+        <rect x="2.5" y="16" width="23.5" height="18" fill="none" stroke="var(--nctl)" stroke-width=".5"/>
+        <rect x="34" y="15" width="36" height="20" fill="none" stroke="var(--npot)" stroke-width=".5"/>
+        <rect x="78" y="8" width="52" height="34" fill="none" stroke="var(--nfan)" stroke-width=".5"/>
+        <rect x="-0.6" y="18.75" width="3.2" height="12.5" fill="var(--accent)"/>
+        <rect x="135.4" y="18" width="3.2" height="14" fill="var(--nfan)"/>
+        <text x="14.25" y="26" font-size="2.8" text-anchor="middle">RP2040</text>
+        <text x="14.25" y="29.4" font-size="2.8" text-anchor="middle">-Zero</text>
+        <text x="52" y="26.2" font-size="2.8" text-anchor="middle">X9C103</text>
+        <text x="104" y="26.2" font-size="2.8" text-anchor="middle">Owltree PC039b</text>
+        <text x="0" y="-4" font-size="2.6" fill="var(--accent)">USB-C to Spark</text>
+        <text x="138" y="-4" font-size="2.6" text-anchor="end" fill="var(--nfan)">fan lead notch</text>
+        <text x="69" y="-13" font-size="2.6" text-anchor="middle" fill="var(--muted)">zip-tie ear</text>
+        <path d="M0 68 H138 M0 66 V70 M138 66 V70" stroke="var(--muted)" stroke-width=".3" fill="none"/>
+        <text x="69" y="66.4" font-size="2.6" text-anchor="middle" fill="var(--muted)">138 mm</text>
+        <path d="M146 0 V50 M144 0 H148 M144 50 H148" stroke="var(--muted)" stroke-width=".3" fill="none"/>
+        <text x="150" y="26" font-size="2.6" fill="var(--muted)" transform="rotate(90 150 26)" text-anchor="middle">50 mm</text>
+      </svg>
+      <div class="titleblock">
+        <span>Top view, lid off · defaults</span>
+        <span>138 × 50 × 22.6 mm outside</span>
+        <span>2 mm walls · friction lid · vents over the Owltree</span>
+      </div>
+    </div>
+
+    <div class="two">
+      <div style="display:grid;gap:12px">
+        <h3>Measure these first</h3>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Value</th><th>Default</th><th>What it is</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">x9_L, x9_W</td><td class="num">36 × 20</td><td>X9C103 module outline</td></tr>
+              <tr><td class="mono">ow_L, ow_W</td><td class="num">52 × 34</td><td>Owltree outline</td></tr>
+              <tr><td class="mono">pcb_t</td><td class="num">1.6</td><td>Thickest PCB</td></tr>
+              <tr><td class="mono">*_under</td><td class="num">3</td><td>Pins and solder tails below each board. Set <span class="mono">rp_under</span> to about 9 if the RP2040's headers point down.</td></tr>
+              <tr><td class="mono">*_above</td><td class="num">12–14</td><td>Tallest part above each board, including Dupont plugs or the seated fan plug</td></tr>
+              <tr><td class="mono">usb_zc</td><td class="num">1.6</td><td>RP2040 USB-C centre above its PCB</td></tr>
+              <tr><td class="mono">fan_y</td><td class="num">17</td><td>Fan header centre from the Owltree's near edge</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px">
+        <h3>Printing</h3>
+        <ol class="steps">
+          <li>Set <span class="mono">part = "assembled"</span> and preview (F5) to check fit with the ghost boards.</li>
+          <li>Set <span class="mono">part = "print"</span>, render (F6), and export the STL. The base prints open side up and the lid plate-down, with no supports.</li>
+          <li>PLA+ is fine beside the Spark. Use PETG if the box sits in the exhaust stream.</li>
+          <li>Hold each board in its brackets with a dab of hot glue or foam tape.</li>
+        </ol>
+        <p class="muted">Options in the file: a window over the Owltree's speed display, and a second USB-C opening if you ever power the Owltree from its own cable.</p>
+      </div>
+    </div>
+
+    <details id="scad">
+      <summary><span>fan_controller_box.scad</span><button type="button" id="copy">Copy source</button></summary>
+      <pre id="src">// Spark fan controller box
+// Parametric enclosure for the hyudryu DGX-Spark-Fan-Shroud controller:
+// RP2040-Zero + X9C103 module + Owltree PC039b USB-C PWM fan controller.
+//
+// Layout: the three boards sit in a row on corner locating brackets.
+//   -X wall: RP2040-Zero USB-C opening (the one cable to the Spark)
+//   +X wall: U-notch for the fan lead, open at the top so the plug drops in
+//   lid:     friction-fit lip, vent slots over the Owltree boost converter
+//   +/-Y:    zip-tie ears for strapping to the shroud leg or base
+//
+// Check every value marked MEASURE with calipers before printing.
+// Units: mm. X runs along the row of boards, Y across, Z up.
+// Hold boards in their brackets with a dab of hot glue or foam tape.
+
+/* [Output] */
+part = &quot;print&quot;; // [print, base, lid, assembled]
+
+/* [Board footprints: L along X, W along Y] */
+rp_L = 23.5;    // RP2040-Zero (Waveshare datasheet)
+rp_W = 18.0;
+x9_L = 36.0;    // X9C103 module                          MEASURE
+x9_W = 20.0;    //                                        MEASURE
+ow_L = 52.0;    // Owltree PC039b                         MEASURE
+ow_W = 34.0;    //                                        MEASURE
+pcb_t = 1.6;    // thickest of the three PCBs             MEASURE
+
+/* [Clearance below each board: pins, solder tails] */
+rp_under = 3;   // raise to ~9 if headers point down
+x9_under = 3;   //                                        MEASURE
+ow_under = 3;   //                                        MEASURE
+
+/* [Tallest part above each board, incl. plugs and jumpers] */
+rp_above = 12;  // Dupont housings ~12; ~4 if wires are soldered
+x9_above = 12;
+ow_above = 14;  // fan plug seated in its header          MEASURE
+
+/* [Spacing] */
+board_gap = 8;  // between boards along X, for wiring
+side_gap  = 6;  // each side along Y, for wiring
+end_gap   = 6;  // Owltree to the +X wall
+
+/* [RP2040-Zero USB-C opening, -X wall] */
+usb_w  = 12.5;  // fits a typical USB-C plug overmold
+usb_h  = 7.5;
+usb_zc = 1.6;   // connector centre above the PCB top     MEASURE
+usb_y  = 9.0;   // connector centre from the board&#x27;s -Y edge
+
+/* [Fan lead notch, +X wall] */
+fan_w = 14;
+fan_y = 17;     // notch centre from the Owltree&#x27;s -Y edge MEASURE
+fan_z = 4;      // notch floor above the box floor
+
+/* [Optional Owltree USB-C opening, -Y wall (two-cable wiring)] */
+ow_usb_cut = false;
+ow_usb_x   = 26;  // from the Owltree&#x27;s -X edge           MEASURE
+ow_usb_zc  = 1.6; // connector centre above the PCB top   MEASURE
+
+/* [Lid] */
+vents = true;
+display_window = false; // over the Owltree&#x27;s speed display
+disp_x = 10;    // window corner from the Owltree&#x27;s -X/-Y corner MEASURE
+disp_y = 8;
+disp_w = 20;
+disp_h = 10;
+
+/* [Shell] */
+wall      = 2.0;
+floor_t   = 2.0;
+lid_t     = 2.0;
+corner_r  = 3.0;
+lip_h     = 4.0;  // lid lip depth
+lip_t     = 1.6;
+lid_fit   = 0.2;  // lid lip clearance per side
+board_fit = 0.3;  // board clearance inside its brackets
+pad       = 3.0;  // support pad under each board corner
+brk_t     = 1.2;  // bracket wall thickness
+brk_rise  = 1.5;  // bracket height above the PCB top
+
+/* [Mounting ears] */
+ears   = true;
+ear_len = 10;
+ear_w   = 16;
+ear_t   = 3;
+slot_l  = 8;
+slot_w  = 3.5;
+
+/* [Hidden] */
+$fn = 32;
+usb_gap = 0.5;  // RP2040 USB edge to the -X wall
+
+inner_L = usb_gap + rp_L + board_gap + x9_L + board_gap + ow_L + end_gap;
+inner_W = max(rp_W, x9_W, ow_W) + 2 * side_gap;
+inner_H = max(rp_under + rp_above, x9_under + x9_above, ow_under + ow_above) + pcb_t;
+
+outer_L = inner_L + 2 * wall;
+outer_W = inner_W + 2 * wall;
+base_H  = floor_t + inner_H;
+
+// Board origins: the -X/-Y corner of each PCB, in box coordinates.
+function centred_y(W) = wall + (inner_W - W) / 2;
+
+rp_x = wall + usb_gap;
+x9_x = rp_x + rp_L + board_gap;
+ow_x = x9_x + x9_L + board_gap;
+rp_y = centred_y(rp_W);
+x9_y = centred_y(x9_W);
+ow_y = ow_usb_cut ? wall + usb_gap : centred_y(ow_W);
+
+
+// ---------------------------------------------------------------------
+// Primitives
+// ---------------------------------------------------------------------
+
+module rrect(L, W, h, r) {
+    linear_extrude(h) offset(r) offset(-r) square([L, W]);
+}
+
+// One corner bracket for a board corner at the origin, board toward +X/+Y.
+module corner_bracket(under) {
+    h = under + pcb_t + brk_rise;
+    o = board_fit + brk_t;
+    cube([pad, pad, under]);                          // support pad
+    difference() {                                    // L-shaped locator
+        translate([-o, -o, 0]) cube([pad + o, pad + o, h]);
+        translate([-board_fit, -board_fit, -1]) cube([pad + o, pad + o, h + 2]);
+    }
+}
+
+module brackets(x, y, L, W, under) {
+    for (cx = [0, 1], cy = [0, 1])
+        translate([x + cx * L, y + cy * W, floor_t])
+            scale([cx == 1 ? -1 : 1, cy == 1 ? -1 : 1, 1])
+                corner_bracket(under);
+}
+
+// Zip-tie ear protruding toward -Y from a wall at y = 0.
+module ear() {
+    translate([-ear_w / 2, -ear_len, 0])
+        difference() {
+            cube([ear_w, ear_len + 0.5, ear_t]);
+            translate([(ear_w - slot_l) / 2, (ear_len - slot_w) / 2, -1])
+                cube([slot_l, slot_w, ear_t + 2]);
+        }
+}
+
+
+// ---------------------------------------------------------------------
+// Base
+// ---------------------------------------------------------------------
+
+module shell() {
+    difference() {
+        rrect(outer_L, outer_W, base_H, corner_r);
+        translate([wall, wall, floor_t])
+            rrect(inner_L, inner_W, base_H, max(corner_r - wall, 0.01));
+    }
+}
+
+module cutouts() {
+    // RP2040-Zero USB-C, -X wall
+    usb_z = floor_t + rp_under + pcb_t + usb_zc;
+    translate([-1, rp_y + usb_y - usb_w / 2, usb_z - usb_h / 2])
+        cube([wall + usb_gap + 1, usb_w, usb_h]);
+
+    // Fan lead U-notch, +X wall, open at the top
+    translate([outer_L - wall - 1, ow_y + fan_y - fan_w / 2, floor_t + fan_z])
+        cube([wall + 2, fan_w, base_H]);
+
+    // Optional Owltree USB-C, -Y wall
+    if (ow_usb_cut) {
+        z = floor_t + ow_under + pcb_t + ow_usb_zc;
+        translate([ow_x + ow_usb_x - usb_w / 2, -1, z - usb_h / 2])
+            cube([usb_w, wall + usb_gap + 1, usb_h]);
+    }
+}
+
+module base() {
+    difference() {
+        union() {
+            shell();
+            brackets(rp_x, rp_y, rp_L, rp_W, rp_under);
+            brackets(x9_x, x9_y, x9_L, x9_W, x9_under);
+            brackets(ow_x, ow_y, ow_L, ow_W, ow_under);
+            if (ears) {
+                translate([outer_L / 2, 0, 0]) ear();
+                translate([outer_L / 2, outer_W, 0]) mirror([0, 1, 0]) ear();
+            }
+        }
+        cutouts();
+    }
+}
+
+
+// ---------------------------------------------------------------------
+// Lid (modelled in place on top of the base)
+// ---------------------------------------------------------------------
+
+module lid_assembled() {
+    r_in = max(corner_r - wall - lid_fit, 0.01);
+    lip_L = inner_L - 2 * lid_fit;
+    lip_W = inner_W - 2 * lid_fit;
+
+    difference() {
+        union() {
+            translate([0, 0, base_H]) rrect(outer_L, outer_W, lid_t, corner_r);
+            translate([wall + lid_fit, wall + lid_fit, base_H - lip_h])
+                difference() {
+                    rrect(lip_L, lip_W, lip_h + 0.01, r_in);
+                    translate([lip_t, lip_t, -1])
+                        rrect(lip_L - 2 * lip_t, lip_W - 2 * lip_t, lip_h + 2,
+                              max(r_in - lip_t, 0.01));
+                }
+        }
+
+        // Keep the fan notch and USB opening clear of the lip
+        translate([outer_L - wall - lid_fit - lip_t - 1, ow_y + fan_y - fan_w / 2,
+                   base_H - lip_h - 1])
+            cube([lip_t + 2, fan_w, lip_h + 1]);
+        translate([wall + lid_fit - 1, rp_y + usb_y - usb_w / 2, base_H - lip_h - 1])
+            cube([lip_t + 2, usb_w, lip_h + 1]);
+
+        if (vents)
+            for (i = [0 : floor((ow_L - 10) / 5)])
+                translate([ow_x + 5 + i * 5, ow_y + ow_W * 0.2, base_H - 1])
+                    cube([2, ow_W * 0.6, lid_t + 2]);
+
+        if (display_window)
+            translate([ow_x + disp_x, ow_y + disp_y, base_H - 1])
+                cube([disp_w, disp_h, lid_t + 2]);
+    }
+}
+
+// Flipped plate-down for printing.
+module lid_print() {
+    rotate([180, 0, 0]) translate([0, 0, -(base_H + lid_t)]) lid_assembled();
+}
+
+// Ghost boards for the assembled preview.
+module boards() {
+    color(&quot;ForestGreen&quot;) translate([rp_x, rp_y, floor_t + rp_under]) cube([rp_L, rp_W, pcb_t]);
+    color(&quot;RoyalBlue&quot;)   translate([x9_x, x9_y, floor_t + x9_under]) cube([x9_L, x9_W, pcb_t]);
+    color(&quot;DimGray&quot;)     translate([ow_x, ow_y, floor_t + ow_under]) cube([ow_L, ow_W, pcb_t]);
+}
+
+
+// ---------------------------------------------------------------------
+// Output
+// ---------------------------------------------------------------------
+
+echo(str(&quot;Outer size: &quot;, outer_L, &quot; x &quot;, outer_W, &quot; x &quot;, base_H + lid_t, &quot; mm&quot;));
+
+if (part == &quot;base&quot;) {
+    base();
+} else if (part == &quot;lid&quot;) {
+    lid_print();
+} else if (part == &quot;assembled&quot;) {
+    base();
+    boards();
+    color(&quot;LightSteelBlue&quot;, 0.45) lid_assembled();
+} else {
+    base();
+    translate([0, -(ear_len + 5), 0]) lid_print();
+}</pre>
+    </details>
+  </section>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('copy');
+  var src = document.getElementById('src');
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy source'; }, 1600); };
+    var fallback = function () {
+      document.getElementById('scad').open = true;
+      var r = document.createRange(); r.selectNodeContents(src);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = 'Selected: press Ctrl+C';
+    };
+    try {
+      navigator.clipboard.writeText(src.textContent).then(done, fallback);
+    } catch (err) { fallback(); }
+  });
+})();
+</script>
