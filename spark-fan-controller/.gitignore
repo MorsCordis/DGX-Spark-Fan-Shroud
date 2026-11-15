@@ -3,3 +3,7 @@ __pycache__/
 *.lck
 *-backups/
 fp-info-cache
+
+# not ours to redistribute / fetched separately
+firmware/uf2/
+hardware/enclosure/ref/nvidia_dgx_spark_printables_1512927.stl

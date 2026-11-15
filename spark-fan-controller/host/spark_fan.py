@@ -12,12 +12,18 @@ Fan duty each tick is the MAX of two independent demands:
                   temperature actually needs. When load drops, the baseline
                   drops with it, so the next load step gets the full boost.
 
-  thermal demand  Hottest of CPU (hwmon) and GPU (nvidia-smi) temperature,
-                  mapped through TEMP_CURVE. This sets the steady-state speed
-                  under sustained load.
+  thermal demand  The higher of the MEAN CPU hwmon zone temperature and the
+                  GPU (nvidia-smi) temperature, mapped through TEMP_CURVE.
+                  This sets the steady-state speed under sustained load.
+                  The mean is used because on GB10 a single acpitz zone
+                  follows whichever core the busiest thread is on (90+ C
+                  while the rest of the package sits ~25 C lower, gone 3 s
+                  after the load stops). Airflow cannot cool that spot, and
+                  chasing it pinned the fan at 100%.
 
 Safety overrides, in order:
-  - any temperature >= TEMP_PANIC_C            -> 100%
+  - mean/GPU temperature >= TEMP_PANIC_C       -> 100%
+  - any single CPU zone >= HOTSPOT_PANIC_C     -> 100%
   - no temperature readable                    -> 100%
   - load telemetry unreadable                  -> thermal demand only
   - this script dies / USB link lost           -> firmware watchdog, 100%
@@ -49,11 +55,15 @@ POLL_S = 1.0
 # (load fraction 0..1, duty %). Piecewise linear, held flat beyond the ends.
 LOAD_CURVE = [(0.00, 20.0), (0.15, 30.0), (0.50, 65.0), (0.80, 90.0), (1.00, 100.0)]
 
-# (temperature C, duty %). Steady-state curve: the box settles where this
-# duty removes the heat being made. 100% is reached before TEMP_PANIC_C.
-TEMP_CURVE = [(55.0, 20.0), (68.0, 30.0), (76.0, 50.0), (82.0, 75.0), (87.0, 100.0)]
+# (temperature C, duty %), keyed on the MEAN CPU zone temperature (or the GPU,
+# if hotter). Steady-state curve: the box settles where this duty removes
+# the heat being made. 100% is reached before TEMP_PANIC_C. Under GLM decode
+# the mean runs ~10 C below the hottest zone, so this is the old
+# hottest-zone curve (55/68/76/82/87) shifted down 10 C.
+TEMP_CURVE = [(45.0, 20.0), (58.0, 30.0), (66.0, 50.0), (72.0, 75.0), (77.0, 100.0)]
 
-TEMP_PANIC_C = 90.0
+TEMP_PANIC_C = 80.0      # mean CPU zone or GPU
+HOTSPOT_PANIC_C = 95.0   # any single CPU zone (ACPI critical trip is 104.8 C)
 
 # GPU power that counts as "full load". Used only if nvidia-smi reports
 # power.draw; otherwise utilization alone drives the load estimate.
@@ -126,7 +136,11 @@ def find_cpu_temp_inputs():
                 name = f.read().strip().lower()
         except OSError:
             continue
-        if name in CPU_HWMON_NAMES:
+        # Newer kernels number the ACPI zones ("acpitz_0".."acpitz_6" on the
+        # Spark since kernel 7.0.0-10xx), so strip a trailing "_<n>".
+        base = name.rstrip("0123456789")
+        base = base[:-1] if base.endswith("_") and base != name else name
+        if name in CPU_HWMON_NAMES or base in CPU_HWMON_NAMES:
             inputs.extend(sorted(glob.glob(os.path.join(dev, "temp*_input"))))
     return inputs
 
@@ -141,7 +155,9 @@ def read_cpu_temp(inputs):
             continue
         if -20.0 <= value <= 150.0:
             temps.append(value)
-    return max(temps) if temps else None
+    if not temps:
+        return None, None
+    return sum(temps) / len(temps), max(temps)
 
 
 def _num(field):
@@ -288,10 +304,11 @@ class Controller:
         self.duty = None
         self.last_t = None
 
-    def step(self, now, cpu_temp, gpu_temp, gpu_util, gpu_power, cpu_util):
+    def step(self, now, cpu_temp, gpu_temp, gpu_util, gpu_power, cpu_util, cpu_max=None):
         dt = POLL_S if self.last_t is None else max(0.0, now - self.last_t)
         self.last_t = now
 
+        # cpu_temp is the mean CPU zone; cpu_max only feeds the hotspot panic.
         temps = [t for t in (cpu_temp, gpu_temp) if t is not None]
         hot = max(temps) if temps else None
 
@@ -330,6 +347,8 @@ class Controller:
             target, why = 100.0, "no-temp"
         elif hot >= TEMP_PANIC_C:
             target, why = 100.0, "panic"
+        elif cpu_max is not None and cpu_max >= HOTSPOT_PANIC_C:
+            target, why = 100.0, "hotspot"
         elif raw_load is None:
             target, why = temp_pct, "thermal-only"
         elif temp_pct > load_pct:
@@ -364,14 +383,15 @@ def main():
         started = time.monotonic()
         try:
             gpu_temp, gpu_util, gpu_power = read_gpu()
+            cpu_mean, cpu_max = read_cpu_temp(cpu_inputs)
             duty, why, hot, raw_load, load_pct, temp_pct, boost, slope = ctl.step(
-                started, read_cpu_temp(cpu_inputs), gpu_temp,
-                gpu_util, gpu_power, cpu_util.read(),
+                started, cpu_mean, gpu_temp,
+                gpu_util, gpu_power, cpu_util.read(), cpu_max,
             )
         except Exception as exc:  # never leave the fan low on a bug
             print(f"control error: {exc!r}; forcing 100%", flush=True)
             duty, why, hot, raw_load, load_pct, temp_pct = 100.0, "error", None, None, 0.0, 100.0
-            boost, slope = 0.0, 0.0
+            boost, slope, cpu_max = 0.0, 0.0, None
 
         if link is not None:
             link.send(pct_to_byte(duty))
@@ -383,6 +403,7 @@ def main():
                 f"duty {duty:5.1f}% [{why:12s}] "
                 f"load {('-' if raw_load is None else f'{raw_load:4.2f}')} boost {boost:4.2f} -> {load_pct:5.1f}%  "
                 f"temp {('-' if hot is None else f'{hot:5.1f}C')} {slope:+5.1f}C/min -> {temp_pct:5.1f}%  "
+                f"max {('-' if cpu_max is None else f'{cpu_max:5.1f}C')}  "
                 f"rpm {('-' if rpm is None else rpm)}",
                 flush=True,
             )

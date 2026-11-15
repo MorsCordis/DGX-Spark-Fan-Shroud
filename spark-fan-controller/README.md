@@ -25,7 +25,7 @@ RP2040-Zero plugs into two 1x9 sockets. Its USB 5 V feeds an MT3608 boost to 12.
 (100k/5.1k feedback) for a 4-pin PWM fan header. GP28 drives fan pin 4 through a 2N7002
 (open drain, inverted, gate pulled down, so a dead or unflashed RP2040 means full speed).
 GP29 reads the tach through 1k with a 10k pull-up and 1 nF filter. 1.5 A PTC on the 5 V input,
-green LED on 12 V. 24 x 50 mm, two layers, GND pour both sides, two M2.5 holes.
+red LED on 12 V (D2, C2286; green C72043 was out of stock at order time). 24 x 50 mm, two layers, GND pour both sides, two M2.5 holes.
 
 Rebuild everything (KiCad's bundled python):
 
